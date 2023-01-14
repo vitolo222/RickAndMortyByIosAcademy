@@ -7,11 +7,20 @@
 
 import UIKit
 
+protocol RMCharacterListViewDelagate: AnyObject {
+    func rmCharacterListView(
+        _ characterListView: RMCharacterListView,
+        didSelectCharacter character: RMCharacter
+    )
+}
+
 /// View taht handles  showing list of characters, loader, etc
-final class CharacterListView: UIView {
+final class RMCharacterListView: UIView {
 
     
-    private let viewModel = CharacterListViewViewModel()
+    public weak var delegate: RMCharacterListViewDelagate?
+    
+    private let viewModel = RMCharacterListViewViewModel()
     
     
     private let spinner: UIActivityIndicatorView = {
@@ -24,13 +33,16 @@ final class CharacterListView: UIView {
     private let collectionView: UICollectionView = {
         let layout = UICollectionViewFlowLayout()
         layout.scrollDirection = .vertical
-        layout.sectionInset = UIEdgeInsets(top: 0, left: 10, bottom: 0, right: 10)
+        layout.sectionInset = UIEdgeInsets(top: 0, left: 10, bottom: 10, right: 10)
         let collectionView = UICollectionView.init(frame: .zero, collectionViewLayout: layout)
         collectionView.isHidden = true
         collectionView.alpha = 0
         collectionView.translatesAutoresizingMaskIntoConstraints = false
-        collectionView.register(UICollectionViewCell.self, forCellWithReuseIdentifier: "cell")
+        collectionView.register(RMCharacterCollectionViewCell.self, forCellWithReuseIdentifier: RMCharacterCollectionViewCell.cellIdentifier)
         
+        collectionView.register(RMFooterLoadingCollectionReusableView.self,
+                                forSupplementaryViewOfKind: UICollectionView.elementKindSectionFooter,
+                                withReuseIdentifier: RMFooterLoadingCollectionReusableView.indentifier)
         return collectionView
     }()
     
@@ -42,6 +54,7 @@ final class CharacterListView: UIView {
          addSubviews(collectionView, spinner)
         addConstraints()
         spinner.startAnimating()
+        viewModel.delegate = self 
         viewModel.fetchCharacters()
         setUpCollectionView()
     }
@@ -71,16 +84,29 @@ final class CharacterListView: UIView {
         collectionView.dataSource = viewModel
         collectionView.delegate = viewModel
         
-        
-        DispatchQueue.main.asyncAfter(deadline: .now()+2, execute: {
-            self.spinner.stopAnimating()
-            
-            self.collectionView.isHidden = false
-         
-            
+   
+    }
+}
+
+extension RMCharacterListView: RMCharacterListViewViewModelDelegate {
+    func didSecectCharacter(_ character: RMCharacter) {
+        delegate?.rmCharacterListView(self, didSelectCharacter: character)
+    }
+    
+    func didLoadInitialCharacter() {
+        spinner.stopAnimating()
+        collectionView.isHidden = false
+        collectionView.reloadData()
             UIView.animate(withDuration: 0.4) {
                 self.collectionView.alpha = 1
             }
-        })
+    
     }
+    func didLoadMoreCharacters(with newIndexPaths: [IndexPath]) {
+        collectionView.performBatchUpdates {
+            
+            self.collectionView.insertItems(at: newIndexPaths)
+        }
+    }
+    
 }
